@@ -12,29 +12,34 @@ app.listen(5000, () => {
 
 const middlewareValidarDatos = async (req, res, next) => {
     try {
-        const { email, password, rol, lenguaje } = req.body;
-        //validar data
-        if ((email.length === 0 || email === undefined)
-            && (password.length === 0 || password === undefined)
-            && (rol.length === 0 || rol === undefined)
-            && (lenguaje.length === 0 || lenguaje === undefined)) {
-            return res.status(400).send('Datos incompletos');
-
+        const { email, password, rol, lenguage } = req.body;
+        if (email && password && rol && lenguage) {
+            next();
+        }
+        else {
+            res.status(401).json('Datos incompletos');
         }
     }
     catch (error) {
         console.log(error);
     }
-    next();
-}
+};
 
 app.post('/usuarios', middlewareValidarDatos, async (req, res) => {
-    try {
-        const params = req.body;
-        const resultado = await insertarUsuario(params);
-        res.json(resultado);
-    }
-    catch (error) {
-        console.log(error);
-    }
+    const { email, password, rol, lenguage } = req.body;
+    const resultado = await insertarUsuario(email, password, rol, lenguage);
+    res.json(resultado);
+    
 });
+
+
+
+/* app.post('/usuarios', middlewareValidarDatos, async (req, res) => {
+
+        const {email, password, rol, lenguage} = req.body;
+        console.log({email, password, rol, lenguage});
+        const resultado = await insertarUsuario(email, password, rol, lenguage);
+        res.json(resultado);
+
+});
+ */
