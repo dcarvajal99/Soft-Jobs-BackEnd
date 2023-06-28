@@ -8,7 +8,7 @@ export default function Home() {
   const [usuario, setUsuarioLocal] = useState({});
 
   const getUsuarioData = async () => {
-    const urlServer = "http://localhost:3000";
+    const urlServer = "http://localhost:5000";
     const endpoint = "/usuarios";
     const token = localStorage.getItem("token");
 
