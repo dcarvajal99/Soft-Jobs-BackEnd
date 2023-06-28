@@ -46,7 +46,7 @@ const verificarCredenciales = async (email, password) => {
         throw { code: 404, message: "No se encontró ningún usuario con estas credenciales" };
     }
 }
-
+/* https://github.com/lorenzoch2/soft-jobs-back/blob/main/index.js */
 
 module.exports = { insertarUsuario, verificarCredenciales };
 
