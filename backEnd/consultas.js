@@ -1,22 +1,25 @@
 const { Pool } = require('pg');
 const format = require('pg-format');
+require('dotenv').config();
+const bcrypt = require('bcryptjs');
 
 const pool = new Pool({
-    host: 'localhost',
-    user: 'postgres',
-    password: 'Daxer_200K',
-    database: 'softjobs',
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
     allowExitOnIdle: true,
 });
 
-const insertarUsuario = async ( email, password, rol, lenguage ) => {
+const insertarUsuario = async (email, password, rol, lenguage) => {
     try {
-        const formatedQuery = format('INSERT INTO usuarios (email, password, rol, lenguage) VALUES (%L, %L, %L, %L)', email, password, rol, lenguage);
+        let passwordHash = bcrypt.hashSync(password);
+        const formatedQuery = format('INSERT INTO usuarios (email, password, rol, lenguage) VALUES (%L, %L, %L, %L) RETURNING *', email, passwordHash, rol, lenguage);
         const resultado = await pool.query(formatedQuery);
-        if(resultado.rowCount === 1){
+        if (resultado.rowCount === 1) {
             return "Usuario creado con exito";
         }
-        else{
+        else {
             return "Error al crear usuario";
         }
     }
@@ -39,14 +42,20 @@ const insertarUsuario = async ( email, password, rol, lenguage ) => {
 };
 
 const verificarCredenciales = async (email, password) => {
-    const consulta = "SELECT * FROM usuarios WHERE email = $1 AND password = $2"
-    const values = [email, password]
-    const { rowCount } = await pool.query(consulta, values)
-    if (!rowCount) {
-        throw { code: 404, message: "No se encontró ningún usuario con estas credenciales" };
+    try{
+        const values = [email]
+        const consulta = "SELECT * FROM usuarios WHERE email = $1"
+        const { rows: [usuario], rowCount } = await pool.query(consulta, values)
+        const { password: passwordEncriptada } = usuario
+        const passwordEsCorrecta = bcrypt.compareSync(password, passwordEncriptada)
+        if (!passwordEsCorrecta || !rowCount) {
+            return false;
+        }
+    }
+    catch(error){
+        throw error;
     }
 }
-/* https://github.com/lorenzoch2/soft-jobs-back/blob/main/index.js */
 
 module.exports = { insertarUsuario, verificarCredenciales };
 
