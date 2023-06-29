@@ -42,20 +42,26 @@ const insertarUsuario = async (email, password, rol, lenguage) => {
 };
 
 const verificarCredenciales = async (email, password) => {
-    try{
+
         const values = [email]
         const consulta = "SELECT * FROM usuarios WHERE email = $1"
         const { rows: [usuario], rowCount } = await pool.query(consulta, values)
         const { password: passwordEncriptada } = usuario
         const passwordEsCorrecta = bcrypt.compareSync(password, passwordEncriptada)
-        if (!passwordEsCorrecta || !rowCount) {
+        if (!usuario || !passwordEsCorrecta) {
             return false;
+          }
+        else {
+            return usuario;
         }
-    }
-    catch(error){
-        throw error;
-    }
 }
 
-module.exports = { insertarUsuario, verificarCredenciales };
+const verificarCredencialesEmail = async (email) => {
+    const consulta = "SELECT * FROM usuarios WHERE email = $1";
+    const value = [email]
+    const {rows: [usuario]} = await pool.query(consulta, value);
+    return usuario;
+  };
+
+module.exports = { insertarUsuario, verificarCredenciales,verificarCredencialesEmail };
 

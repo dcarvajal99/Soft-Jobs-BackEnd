@@ -1,17 +1,19 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
-const {insertarUsuario, verificarCredenciales} = require('./consultas');
+const { insertarUsuario, verificarCredenciales, verificarCredencialesEmail} = require('./consultas');
 const jwt = require('jsonwebtoken');
+const e = require('express');
 require('dotenv').config();
 
 
+
+app.listen(process.env.PORT, () => {
+    console.log(`Server is running on port ${process.env.PORT}`);
+});
 app.use(cors());
 app.use(express.json());
 
-app.listen(5000, () => {
-    console.log('Server is running on port 5000');
-});
 //middleware para verificar credenciales en el formulario
 const middlewareVerificarCredencialesForm = async (req, res, next) => {
     try {
@@ -31,45 +33,38 @@ const middlewareVerificarCredencialesForm = async (req, res, next) => {
 //middleware para verificar credenciales en el login
 const middlewareVerificarCredencialesLogin = async (req, res, next) => {
     try {
-        const { email, password } = req.body;
-        if (email && password) {
-            next();
+        const { email} = req.body;
+        const usuario = await verificarCredencialesEmail(email);
+        if (!usuario) {
+            return res.status(404).json('Usuario o contraseña incorrectos');
         }
-        else {
-            res.status(401).json('Datos incompletos');
-        }
-    }
-    catch (error) {
-        console.log(error);
+        req.usuario = usuario;
+        next();
+    } catch (error) {
+        res.status(500).json(error.message);
     }
 };
 
 
 //middleware para validar token
-const middlewareValidarToken = async (req, res, next) => {
+const middlewareValidarToken = (req, res, next) => {
     try {
-        const token = req.headers.authorization.split(' ')[1];
-        if(!token){
-            res.status(401).json('sin token');
+        const Authorization = req.header("Authorization");
+        const token = Authorization.split("Bearer ")[1];
+        if (!token) {
+            return res.status(401).json('Sin token');
         }
-        jwt.verify(token, process.env.SECRET_KEY,(err, user) => {
-            if(err){
-                res.status(401).json('token invalido');
+        jwt.verify(token, process.env.SECRET_KEY, (err, decoded) => {
+            if (err) {
+                return res.status(401).json('Token inválido');
             }
-            req.email = user;
-        next();
+            req.email = decoded.email; // Asegúrate de que el token incluya la propiedad 'email'
+            next();
         });
-    }
-    catch (error) {
-        if (error.code === 401) {
-            res.status(401).json('No autorizado');
-        }
-        else {
-            res.status(500).json(error.message);
-        }
+    } catch (error) {
+        res.status(500).json(error.message);
     }
 };
-
 //rutas
 
 app.post('/usuarios', middlewareVerificarCredencialesForm, async (req, res) => {
@@ -79,55 +74,51 @@ app.post('/usuarios', middlewareVerificarCredencialesForm, async (req, res) => {
         res.json(resultado);
     } catch (error) {
         res.status(500).json(error.message);
-    }    
+    }
 });
 
-app.post('/login', middlewareVerificarCredencialesLogin ,async (req, res) => {
-    try {
-        const { email, password} = req.body;
+app.post('/login', middlewareVerificarCredencialesLogin, async (req, res) => {
+        const { email, password } = req.body;
         const usuario = await verificarCredenciales(email, password);
         if (!usuario) {
-            res.status(404).json('Usuario o contraseña incorrectos');
+            return res.status(404).json('Usuario o contraseña incorrectos');
         }
-        const token = jwt.sign(email, process.env.SECRET_KEY);
-        res.json({token});
-    } catch (error) {
-        if (error.code === 404) {
-            res.status(404).json(error.message);
-        }
-        else {
-            res.status(500).json(error.message);
-        }
+        const token = jwt.sign({ email: usuario.email }, process.env.SECRET_KEY);
+        res.send(token);
+});
+
+app.get('/usuarios', middlewareValidarToken, async (req, res) => {
+    const  email  = req.email;
+    console.log("este es el email: " +email);
+    const usuario = await verificarCredencialesEmail(email); // Solo se pasa el email como argumento
+    if (!usuario) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
     }
-});
-
-app.get('/usuarios/:id', middlewareValidarToken ,async (req, res) => {
-    try {
-        const {email} = req.email;
-        const usuario = await verificarCredenciales(email);
-        console.log(email);
-    } catch (error) {
-        if (error.code === 401) {
-            res.status(401).json('No autorizado');
-        }
-        else {
-            res.status(500).json(error.message);
-        }
-    }
-});
-
-
-
-
-
-
-
-/* app.post('/usuarios', middlewareVerificarCredencialesForm, async (req, res) => {
-
-        const {email, password, rol, lenguage} = req.body;
-        console.log({email, password, rol, lenguage});
-        const resultado = await insertarUsuario(email, password, rol, lenguage);
-        res.json(resultado);
+    const usuarioSinClave = {   
+        email: usuario.email,
+        rol: usuario.rol,
+        lenguage: usuario.lenguage
+    };
+    res.json(usuarioSinClave);
 
 });
- */
+
+//middleware para manejar rutas inexistentes
+app.use((req, res, next) => {
+    res.status(404).json({ message: "Ruta no encontrada" });
+});
+
+//middleware para reportar consultas a la base de datos
+app.use((req, res, next) => {
+    console.log(`Se hizo una consulta a la base de datos desde la ruta ${req.path}`);
+    next();
+});
+
+
+//middleware para manejar errores
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: "Error en el servidor" });
+});
+
+
